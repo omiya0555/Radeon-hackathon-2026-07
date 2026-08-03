@@ -1,0 +1,25 @@
+# Simulation + data pipeline. torch is NOT listed here: on a ROCm host it must come from
+# AMD's wheel index (see Dockerfile), and pip would otherwise pull the CUDA build.
+genesis-world>=1.1.2
+numpy>=1.26.4
+trimesh>=4.8.2
+scipy>=1.11
+
+# Camera I/O and video export. opencv is used directly for the real-robot camera
+# transport (see src/real/ for why the stock LeRobot camera layer is bypassed).
+opencv-python
+imageio
+imageio-ffmpeg
+
+# Plots for the checkpoint / colour-generalisation figures.
+matplotlib
+
+# Policy training and dataset format.
+# ACT needs no model-specific extra; [training] pulls datasets/av/pyarrow + accelerate.
+# torchcodec is excluded on purpose — it is ABI-incompatible with AMD's custom torch
+# build, so the video backend is pinned to pyav (--dataset.video_backend=pyav).
+lerobot[training]==0.6.0
+
+# Real SO-101 hardware only (skip for sim-only reproduction).
+feetech-servo-sdk
+pyserial
