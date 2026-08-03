@@ -75,27 +75,24 @@ underpowered; see the report for the honest treatment.
 
 ## Reproducing
 
-See [`submission/README.md`](submission/README.md) for the full command sequence. The short
-version, on a ROCm host:
+Three commands on a fresh ROCm instance. No robot needed — collection, training and
+closed-loop evaluation all run on the AMD host (verified headless on the hackathon Radeon
+Cloud template).
 
 ```bash
-docker build -t so101-sim2real .
-docker run --rm -it --device=/dev/kfd --device=/dev/dri --group-add video so101-sim2real
+git clone -b track3-so101-cheap-sim2real \
+  https://github.com/omiya0555/Radeon-hackathon-2026-07.git
+cd Radeon-hackathon-2026-07/track3_omiya_SO101_CheapSim2Real/submission
 
-# 1. collect 50 simulated demonstrations with full domain randomisation
-python -m src.data.record_dataset_so101 --episodes 50 --dr-all --repo-id <you>/so101_cube_dr
-
-# 2. train ACT on the Radeon GPU
-lerobot-train --dataset.repo_id=<you>/so101_cube_dr --policy.type=act \
-  --steps=60000 --batch_size=8 --policy.device=cuda --output_dir=outputs/act_dr
-
-# 3. evaluate in simulation on fixed seeds
-python -m src.eval.eval_policy_so101 --policy-path outputs/act_dr/checkpoints/060000/pretrained_model \
-  --repo-id <you>/so101_cube_dr --episodes 20
+bash setup.sh                    # deps + env, ends with a smoke test (SMOKE_OK)
+bash run_pipeline.sh --quick     # collect -> train -> evaluate, ~25 min
 ```
 
-Steps 4-6 (real teleoperation, merging, fine-tuning) need the physical arm; they are
-documented in `submission/README.md`.
+`--quick` is a shortened run so the flow can be seen end to end; `run_pipeline.sh --full`
+(50 episodes, 100k steps, ~13 h) reproduces the numbers above.
+
+[`submission/README.md`](submission/README.md) has the per-experiment commands (checkpoint
+curve, colour sweep), the real-robot path, expected results and troubleshooting.
 
 ## Licence and attribution
 

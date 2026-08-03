@@ -9,9 +9,37 @@ Verified on the hackathon Radeon Cloud host: AMD EPYC 9334 + Radeon GPU,
 
 ---
 
-## 0. Environment
+## 0. Get the project
+
+On a fresh ROCm instance (the hackathon Radeon Cloud template already has torch installed):
 
 ```bash
+git clone -b track3-so101-cheap-sim2real \
+  https://github.com/omiya0555/Radeon-hackathon-2026-07.git
+cd Radeon-hackathon-2026-07/track3_omiya_SO101_CheapSim2Real/submission
+```
+
+Everything below runs from this `submission/` directory. The SO-101 URDF and meshes are
+bundled in `assets/`, so no further downloads are needed to build the scene.
+
+## 1. Environment
+
+Two ways. **Either** use the template's Python directly, which is the shortest path on a
+Radeon Cloud instance:
+
+```bash
+bash setup.sh
+```
+
+That script installs the system libraries and Python dependencies, verifies the template's
+torch actually sees the GPU (and aborts with an explanation if not — the PyPI torch wheel is
+the CUDA build and will not work), persists `PYOPENGL_PLATFORM=egl`, and finishes by running
+the smoke test.
+
+**Or** build the container, if you prefer an isolated environment:
+
+```bash
+cd ..                       # the Dockerfile sits one level up, next to docs/
 docker build -t so101-sim2real .
 docker run --rm -it \
   --device=/dev/kfd --device=/dev/dri --group-add video \
@@ -20,7 +48,7 @@ docker run --rm -it \
   so101-sim2real
 ```
 
-Then, inside the container, confirm the machine can run everything:
+Either way, confirm the machine can run everything before spending GPU hours:
 
 ```bash
 python src/smoke_test_rocm.py
@@ -36,22 +64,35 @@ Expected tail:
 SMOKE_OK — data collection, training and sim evaluation are all runnable here
 ```
 
-Two environment details are **not optional** and the container sets both:
+Two environment details are **not optional**; `setup.sh` and the Dockerfile both handle them,
+but they matter if you install by hand:
 
 | Variable | Why |
 |---|---|
 | `PYOPENGL_PLATFORM=egl` | Genesis rasterises the cameras through pyrender, whose default pyglet path needs a display and fails headless with `IndexError: list index out of range`. Use `osmesa` if your EGL stack is unavailable (software, slower). |
 | `--dataset.video_backend=pyav` (passed per command) | LeRobot defaults to `torchcodec`, whose compiled extension is ABI-incompatible with AMD's custom torch build and fails at import. |
 
-### Running without Docker
+`requirements.txt` deliberately omits **torch** (PyPI's wheel is the CUDA build and will not
+see the Radeon GPU — use the template's or AMD's ROCm wheel) and **torchcodec** (see above).
+
+---
+
+## 2. The whole pipeline in one command
+
+For a first end-to-end run — collect, train, evaluate — use the driver script:
 
 ```bash
-pip install -r requirements.txt      # do NOT pip install torch — use AMD's ROCm wheel
-export PYOPENGL_PLATFORM=egl
+bash run_pipeline.sh --quick     # ~25 min: 5 episodes, 2k steps, 5 eval episodes
+bash run_pipeline.sh --full      # ~13 h:  50 episodes, 100k steps, 20 eval episodes
 ```
 
-`requirements.txt` deliberately omits torch (PyPI's wheel is the CUDA build and will not see
-the Radeon GPU) and torchcodec (see above).
+`--quick` exists so the flow can be demonstrated end to end in one sitting; **`--full`
+reproduces the numbers reported below**. Both print `PIPELINE_OK` and the measured success
+rate at the end.
+
+Path A below is the same pipeline as individual commands, which is what you want when
+reproducing a specific experiment (the checkpoint curve, the colour sweep) rather than the
+whole flow.
 
 ---
 
