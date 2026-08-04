@@ -1,58 +1,73 @@
-# Cheap Sim2Real: teaching a $150 arm a manipulation task with 10 real demonstrations
+# Cheap Sim2Real — teaching a $150 arm with 10 real demonstrations
 
-**Track 3 (Physical AI) — AMD AI DevMaster Hackathon**
+**Track 3 (Physical AI) · AMD AI DevMaster Hackathon**
+Genesis · LeRobot ACT · AMD Radeon GPU / ROCm · SO-101
 
-A complete sim-to-real pipeline for the **SO-101**, a ~$150 3D-printed robot arm. A digital
-twin in [Genesis](https://github.com/Genesis-Embodied-AI/Genesis) auto-collects demonstrations
-with a scripted expert, [ACT](https://arxiv.org/abs/2304.13705) is trained on an
-**AMD Radeon GPU (ROCm)**, and the resulting policy runs on real hardware.
+Imitation learning wants ~50 demonstrations per task. On real hardware that is **2-3 hours of
+a person driving a leader arm, for every task** — the dominant cost of teaching a cheap robot
+anything. So build a measured digital twin, let a scripted expert generate the bulk for free,
+and spend human time only on the handful of episodes that anchor the policy to reality.
 
-**Result: 8/10 success on the physical robot**, from 50 simulated demonstrations plus
-**only 10 human teleoperation episodes** (~35 minutes of a person's time).
+![Real SO-101 and its Genesis twin from the same overhead camera](docs/media/sim2real_overhead.png)
 
-<!-- demo video: docs/demo_video.mp4 -->
+<sub>Two frames placed side by side, centre-cropped to a common aspect and otherwise
+unmodified — the originals are
+[`real_arm_world.png`](docs/media/real_arm_world.png) (real overhead camera) and
+[`sim_arm_world.png`](docs/media/sim_arm_world.png) (Genesis, same pose).</sub>
 
-## Why this matters
+### In 60 seconds
 
-Imitation learning for manipulation conventionally needs ~50 demonstrations per task. On real
-hardware that is 2-3 hours of a human driving a leader arm, per task — the single biggest cost
-in teaching a low-cost arm anything. This project attacks that cost directly: generate the bulk
-of the data in simulation where it is free and reproducible, and spend human time only on the
-10 episodes that anchor the policy to reality.
+| | |
+|---|---|
+| **Result** | **85% success on the physical SO-101** (17/20) from **10 real demonstrations** (~35 min of human time) + 50 simulated ones |
+| **The control arm** | The same 10 real episodes *without* simulated pretraining: 25% (5/20). Fisher exact **p = 0.00033** |
+| **On the GPU** | Simulation stepping, camera rendering, ACT training and closed-loop inference — all on one Radeon (`gs.amdgpu` + ROCm) |
+| **Watch** | [`docs/demo_video.mp4`](docs/demo_video.mp4) — 2:48, a real session from `git clone` to the arm placing the cube |
+| **Reproduce** | 3 commands, ~3 minutes: [jump to it](#reproducing) |
+| **Report** | [`docs/Technical_Report.md`](docs/Technical_Report.md) — method, 5 experiments, failure analysis, stated limits |
 
-The GPU is what makes the trade viable. Each ACT run is 20k-100k optimisation steps over
-tens of thousands of frames with two ResNet-18 vision towers; five such runs went into this
-submission. On the Radeon box each 20k-step fine-tune took **2h11m at 2.56 step/s** with
-3.9 GB VRAM, and the data pipeline never starved the GPU (`data_s` 0.002 s against
-`updt_s` 0.388 s — **99.5% of wall-clock was compute**). Iterating on the recipe — three
-domain-randomisation ablations, a co-training run and a control run — was only affordable
-because the hardware turned each experiment into an overnight job rather than a week.
+### The 10 real demonstrations are what makes it work
+
+<img src="docs/media/real_success.gif" width="49%"> <img src="docs/media/domain_randomisation.gif" width="49%">
+
+**Left:** the physical arm, overhead and wrist cameras. The first grasp slips and the policy
+retries — recovery behaviour it learned from the *simulated* scripted expert, never from a
+human. **Right:** the same scene under domain randomisation, 12 domains at once (cube colour,
+table colour, lighting; friction and mass are re-sampled per episode).
+
+### Why the GPU is load-bearing
+
+Five ACT runs went into this submission — three domain-randomisation ablations, a co-training
+run, and the control run that gives the 25% above. Each is 20k-100k optimisation steps over
+tens of thousands of frames with two ResNet-18 towers. On the Radeon host a 20k-step fine-tune
+takes **2 h 11 m at 2.56 step/s** in 3.9 GB VRAM, and the loader never starves the GPU
+(`data_s` 0.002 s against `updt_s` 0.388 s — **99.5% of wall-clock is compute**). Without
+that, the honest version of this project is one training run and a claim; with it, two
+plausible hypotheses got tested and refuted (§5.2, §5.3) and the headline result got a
+control arm.
 
 ## What is here
 
 | Path | Contents |
 |---|---|
-| `docs/Technical_Report.md` / `.pdf` | Full report: method, five experiments, failure analysis |
-| `docs/demo_video.mp4` | Sim rollouts and the real-robot success |
-| `docs/upstream_contribution_evidence.*` | Upstream issue reported to LeRobot |
-| `submission/src/scene/` | Genesis digital twin + scripted expert (5-DOF IK) |
-| `submission/src/data/` | Dataset recording, domain randomisation, real+sim merge, **camera liveness validation** |
-| `submission/src/train/` | Training commands for ROCm |
-| `submission/src/eval/` | Closed-loop sim evaluation + rollout video audit |
-| `submission/src/real/` | Real SO-101 runner (unit bridge, camera transport, teleop recorder) |
+| [`docs/Technical_Report.md`](docs/Technical_Report.md) | Method, 5 experiments, failure analysis, limitations |
+| [`docs/demo_video.mp4`](docs/demo_video.mp4) | 2:48 — the reproduction sequence running on the Radeon host, then the real robot |
+| [`submission/README.md`](submission/README.md) | Reproduction guide: environment, per-experiment commands, expected results, troubleshooting |
+| `submission/src/` | Digital twin + 5-DOF IK expert, dataset/DR tooling, sim & real evaluation, **camera liveness validation** |
+| `submission/setup.sh` · `run_pipeline.sh` | One-command environment setup and dataset → train → evaluate |
 | `Dockerfile` | Reproducible ROCm environment |
 
 ## Results
 
-**Real robot** (SO-101, cube pick-and-place onto a target sheet, 10 fixed placements)
+**Real robot** (SO-101, cube pick-and-place onto a target sheet, 20 fixed placements)
 
-| Policy | Real success | Placement error |
-|---|---|---|
-| Sim 50 (full DR) pretrain → fine-tune with 10 real episodes | **8/10** | 1-2 cm |
-| 10 real episodes only, from scratch | 3/10 | — |
+| Policy | Real success | 95% CI | Placement error |
+|---|---|---|---|
+| Sim 50 (full DR) pretrain → fine-tune with 10 real episodes | **85%** (17/20) | 64-95% | 1-2 cm |
+| 10 real episodes only, from scratch (control) | 25% (5/20) | 11-47% | — |
 
-Fisher exact test p = 0.070 (two-tailed) — the direction is clear but n=10 per arm is
-underpowered; see the report for the honest treatment.
+20 episodes per arm on the same 20 placements. **Fisher exact test p = 0.00033**
+(two-tailed): the simulated pretraining is what makes 10 real demonstrations enough.
 
 **Simulation** (fixed-seed evaluation, so checkpoints are compared on identical placements)
 
@@ -85,11 +100,12 @@ git clone -b track3-so101-cheap-sim2real \
 cd Radeon-hackathon-2026-07/track3_omiya_SO101_CheapSim2Real/submission
 
 bash setup.sh                    # deps + env, ends with a smoke test (SMOKE_OK)
-bash run_pipeline.sh --quick     # collect -> train -> evaluate, ~25 min
+bash run_pipeline.sh --quick     # dataset -> train -> closed-loop eval, ~3 min
 ```
 
-`--quick` is a shortened run so the flow can be seen end to end; `run_pipeline.sh --full`
-(50 episodes, 100k steps, ~13 h) reproduces the numbers above.
+`--quick` is a plumbing check (100 training steps, so it reports 0% by design);
+`run_pipeline.sh --full` (100k steps, ~11 h) reproduces the 60% above. See
+`docs/demo_video.mp4` for this exact sequence running on the Radeon host.
 
 If the clone fails with `server certificate verification failed`, the image's CA bundle is
 stale — see [§0 of the reproduction guide](submission/README.md#0-get-the-project).

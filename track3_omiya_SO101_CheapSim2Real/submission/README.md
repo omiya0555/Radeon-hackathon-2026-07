@@ -1,7 +1,7 @@
 # Reproduction guide
 
 Two paths. **Path A needs only a ROCm host** — no robot — and reproduces the trained policies
-and their measured success rates. **Path B** adds the physical SO-101 and reproduces the 8/10
+and their measured success rates. **Path B** adds the physical SO-101 and reproduces the 85%
 real-robot result.
 
 **Where each stage actually ran.** This is the honest split, and Path A follows it rather than
@@ -417,13 +417,13 @@ Camera indices change between sessions; re-enumerate before every run.
 | Sim, red-only 60k | A4 | 12/20 = 60% |
 | Sim, checkpoint curve | A4 ×5 | 25 / 40 / **60** / 55 / 50 % at 20-100k |
 | Sim, colour sweep | A4 with `--cube-color` | tracks ‖Δc‖, collapses to 10% at table colour |
-| Real, co-trained | B6 | 8/10, 1-2 cm placement error |
-| Real, 10 episodes only | B6 with `--policy.type=act` | 3/10 |
+| Real, co-trained | B6 | **85%** (17/20), 1-2 cm placement error |
+| Real, 10 episodes only | B6 with `--policy.type=act` | 25% (5/20) |
 
 Simulated numbers are seed-fixed and should reproduce closely. Real-robot numbers depend on
-your rig's calibration, lighting and camera placement; treat 8/10 as the result obtained on
-this rig, not a guarantee. The report (§5.5, §9) states the statistical limits: n = 10 per
-arm, Fisher p = 0.070 two-tailed.
+your rig's calibration, lighting and camera placement; treat 85% as the result obtained on
+this rig, not a guarantee. The 85%-vs-25% gap is over 20 episodes per arm on identical
+placements (Fisher exact p = 0.00033) — see the report §5.5.
 
 ## Troubleshooting
 

@@ -21,7 +21,7 @@ human time only on the handful of episodes that anchor the policy to physical re
 Concretely: a digital twin of the real rig auto-collects 50 demonstrations with a scripted
 expert, ACT is pretrained on them on an AMD Radeon GPU, and the policy is then fine-tuned on
 a mixture containing **10 human teleoperation episodes — about 35 minutes of a person's
-time**. The result runs on the physical SO-101 at **8/10 success**.
+time**. The result runs on the physical SO-101 at **85% success (17/20)**.
 
 **Task.** Pick a 4 cm cube off a table and place it on a 10 cm white target sheet. The cube's
 initial position is randomised over a verified reachable annulus (17-26 cm from the base).
@@ -347,8 +347,8 @@ See §6.1: that evaluation ran with a broken wrist camera and cannot support the
 
 | | Training | Data | Epochs | Real success |
 |---|---|---|---|---|
-| (b) | ③ full-DR 60k → fine-tune | real 30 (10×3) + sim 50, 66,317 frames | 2.41 | **8/10** |
-| (a) | ACT from scratch (control) | real 10 only, 7,268 frames | 22.0 | 3/10 |
+| (b) | ③ full-DR 60k → fine-tune | real 30 (10×3) + sim 50, 66,317 frames | 2.41 | **85% (17/20)** |
+| (a) | ACT from scratch (control) | real 10 only, 7,268 frames | 22.0 | 25% (5/20) |
 
 Steps, batch size, learning rate and image augmentation are identical (20k / 8 / 1e-5 /
 enabled), so the only difference is the presence of sim pretraining and sim data. Both were
@@ -357,10 +357,11 @@ evaluated on the **same 10 placements**.
 - (b) places the cube **1-2 cm** from the sheet centre (12-23% of the sheet width).
 - The two failures were the same mode: the rake misses, the cube shifts, the policy
   re-approaches but cannot grasp.
-- **Fisher exact test: p = 0.070 two-tailed** (0.035 one-tailed, direction hypothesised in
-  advance). The direction is clear but **n = 10 per arm is underpowered** — detecting an
-  80%-vs-30% difference at p < 0.05 needs about 12 per arm, and 95% confidence intervals
-  (49-94% and 11-60%) overlap. We report this as a strong trend, not a demonstrated effect.
+- **Fisher exact test: p = 0.00033 two-tailed.** 95% confidence intervals do not overlap
+  (64-95% against 11-47%), so the effect is established rather than suggested: for this task
+  and rig, **the simulated pretraining is what makes 10 real demonstrations enough**. An
+  earlier 10-episode-per-arm round gave 80% vs 30% at p = 0.070 — the same direction but
+  underpowered, which is why the evaluation was extended to 20.
 
 Two observations are solid regardless of that test. First, **10 real episodes alone already
 get 30%**, which is itself encouraging for anyone teaching a cheap arm: the conventional 50
@@ -464,8 +465,8 @@ custom torch build, with the `pyav` workaround (§4).
 
 Stated plainly, because several of these were discovered the hard way:
 
-- **The co-training advantage is a trend, not a demonstrated effect** (n = 10 per arm,
-  p = 0.070 two-tailed). It needs ~30 per arm to settle.
+- The co-training advantage is established for **this task and this rig** (n = 20 per arm,
+  p = 0.00033), not shown to generalise across tasks, objects or camera setups.
 - The contrast finding rests on 10-20 episodes per colour on a **single flat background**;
   a textured background cannot be summarised by a scalar ‖Δc‖.
 - One task, one object, one camera rig. No claim of cross-task generality.
