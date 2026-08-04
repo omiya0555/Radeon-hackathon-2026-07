@@ -380,7 +380,8 @@ arm, Fisher p = 0.070 two-tailed.
 | Symptom | Cause and fix |
 |---|---|
 | `git clone` → `server certificate verification failed. CAfile: none` | The image's CA bundle is stale and git has no `sslCAInfo`. Fix: `apt-get install -y --reinstall ca-certificates && git config --global http.sslCAInfo /etc/ssl/certs/ca-certificates.crt`. See §0 if that does not help. |
-| `numpy.dtype size changed ... Expected 96, got 88`, or `Numba needs NumPy 2.2 or less` | numpy, numba and scikit-image must move together — moving numpy alone just swaps one error for the other. Install the verified trio: `pip install -U "numpy>=2.4,<2.5" "numba>=0.66" "scikit-image>=0.26"`. `setup.sh` does this automatically when `import genesis` fails. |
+| `numpy.dtype size changed ... Expected 96, got 88`, or `Numba needs NumPy 2.2 or less` | numpy and scikit-image must move together — scikit-image's wheels are compiled against one numpy C API, so changing numpy alone swaps one error for the other. `pip install --force-reinstall "numpy>=2.2,<2.3" "scikit-image>=0.25,<0.26"`. `setup.sh` does this when `import genesis` fails. |
+| `huggingface-hub>=0.34.0,<1.0 is required ... but found huggingface-hub==1.x` during `import lerobot.datasets` | The image ships transformers 4.x, which pins huggingface-hub below 1.0, while lerobot needs 1.0+. Upgrade transformers, do not downgrade the hub: `pip install -U "transformers>=5.5"`. `setup.sh` does this automatically. |
 | `IndexError: list index out of range` in pyglet/pyrender | No display. `export PYOPENGL_PLATFORM=egl` (or `osmesa`). |
 | `ImportError` from torchcodec | ABI mismatch with AMD's torch. Pass `--dataset.video_backend=pyav`; do not install torchcodec. |
 | Grasping never succeeds in sim | Collision meshes were convexified. `convexify=False` is mandatory — it destroys the gripper's concave shape. |

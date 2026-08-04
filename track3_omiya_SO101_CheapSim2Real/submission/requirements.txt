@@ -32,6 +32,14 @@ matplotlib
 # build, so the video backend is pinned to pyav (--dataset.video_backend=pyav).
 lerobot[training]==0.6.0
 
+# lerobot imports transformers (via lerobot.processor.tokenizer_processor) and requires
+# huggingface-hub>=1.0. transformers 4.x demands huggingface-hub<1.0, so a base image carrying
+# transformers 4.x fails at `import lerobot.datasets` with
+# "huggingface-hub>=0.34.0,<1.0 is required ... but found huggingface-hub==1.26.0".
+# transformers 5.x is the version that accepts huggingface-hub 1.x.
+transformers>=5.5
+huggingface-hub>=1.0,<2.0
+
 # Real SO-101 hardware only (skip for sim-only reproduction).
 feetech-servo-sdk
 pyserial

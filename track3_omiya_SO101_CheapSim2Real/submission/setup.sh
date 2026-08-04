@@ -86,6 +86,21 @@ if ! python -c "import genesis" 2>/dev/null; then
 fi
 python -c "import numpy, skimage; print(f'    numpy {numpy.__version__} | scikit-image {skimage.__version__}')"
 
+# Same idea for the LeRobot side. lerobot imports transformers, which in its 4.x line demands
+# huggingface-hub<1.0 while lerobot itself needs >=1.0 — a base image carrying transformers 4.x
+# therefore fails at `import lerobot.datasets`, several frames deep. transformers 5.x resolves it.
+if ! python -c "from lerobot.datasets.lerobot_dataset import LeRobotDataset" 2>/dev/null; then
+  echo "    'import lerobot.datasets' failed — upgrading transformers (4.x pins huggingface-hub<1.0)"
+  pip install --quiet --no-cache-dir -U "transformers>=5.5" "huggingface-hub>=1.0,<2.0"
+  python -c "from lerobot.datasets.lerobot_dataset import LeRobotDataset" || {
+    echo
+    echo "ABORT: 'import lerobot.datasets' still fails. Show the traceback with:"
+    echo "         python -c 'from lerobot.datasets.lerobot_dataset import LeRobotDataset'"
+    exit 1
+  }
+fi
+python -c "import importlib.metadata as m; print(f\"    lerobot {m.version('lerobot')} | transformers {m.version('transformers')} | huggingface-hub {m.version('huggingface-hub')}\")"
+
 log "4/5  Environment defaults"
 # Genesis rasterises the two cameras through pyrender, whose default pyglet backend needs a
 # display and dies headless with "IndexError: list index out of range". EGL renders without
