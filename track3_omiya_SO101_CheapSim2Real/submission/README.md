@@ -157,14 +157,20 @@ For a first end-to-end run — fetch the dataset, train on the Radeon GPU, evalu
 driver script:
 
 ```bash
-bash run_pipeline.sh --quick     # ~20 min: 2k steps, 5 eval episodes
-bash run_pipeline.sh --full      # ~11 h:  100k steps, 20 eval episodes
+bash run_pipeline.sh --quick     # ~5 min: 100 steps, one 10-second eval episode
+bash run_pipeline.sh --full      # ~11 h:  100k steps, 20 full eval episodes
 ```
 
-It downloads `omiya239532/so101_cube_dr` (50 episodes, full DR) rather than collecting, for
-the reason given above, then trains and evaluates. Both modes print `PIPELINE_OK` and the
-measured success rate. `--quick` exists so the flow can be seen end to end in one sitting;
-**`--full` reproduces the reported 60%**.
+Both download `omiya239532/so101_cube_dr` (50 episodes, full DR) rather than collecting, for
+the reason given above, then train on the Radeon GPU and evaluate in closed loop. Both print
+`PIPELINE_OK` and the measured success rate.
+
+**`--quick` is a plumbing check and will report 0%. That is the intended outcome**, not a
+failure of the method: 100 training steps cannot learn a manipulation task. Its job is to
+prove dataset → ROCm training → closed-loop evaluation works end to end, in a few minutes,
+before anyone commits GPU hours. For the actual numbers use `--full`; on this task success is
+25% at 20k steps and peaks at **60% at 60k**, then declines as the 50-episode dataset's
+information ceiling is reached (§5.1).
 
 To collect your own demonstrations instead, see A2 — it works on Apple silicon and is worth
 running there if you have it, since it is the step that replaces hours of teleoperation.

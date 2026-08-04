@@ -2,8 +2,8 @@
 # Fetch the demonstration dataset, train ACT on the Radeon GPU, evaluate in closed loop.
 # No robot required.
 #
-#   bash run_pipeline.sh --quick    # ~20 min: 2k steps, 5 eval episodes
-#   bash run_pipeline.sh --full     # ~11 h:  100k steps, 20 eval episodes
+#   bash run_pipeline.sh --quick    # ~5 min:  100 steps, 1 short eval episode (smoke test)
+#   bash run_pipeline.sh --full     # ~11 h:   100k steps, 20 full eval episodes
 #
 # Why this downloads instead of collecting: the submitted datasets were collected on Apple
 # silicon (gs.metal), and Genesis' contact solver behaves differently on the ROCm backend —
@@ -14,8 +14,11 @@ set -euo pipefail
 
 MODE="${1:---quick}"
 case "$MODE" in
-  --quick) STEPS=2000;   SAVE_FREQ=1000;  EVAL_EPS=5  ;;
-  --full)  STEPS=100000; SAVE_FREQ=20000; EVAL_EPS=20 ;;
+  # --quick is a smoke test of the plumbing, deliberately too small to learn anything:
+  # 100 steps, one episode, and the rollout capped at 10 s so it does not spend 45 s of
+  # simulated time watching an untrained policy do nothing.
+  --quick) STEPS=100;    SAVE_FREQ=100;   EVAL_EPS=1;  EVAL_SECONDS=10 ;;
+  --full)  STEPS=100000; SAVE_FREQ=20000; EVAL_EPS=20; EVAL_SECONDS=45 ;;
   *) echo "usage: $0 [--quick|--full]"; exit 2 ;;
 esac
 
@@ -86,7 +89,7 @@ step "3/4  Closed-loop evaluation in simulation ($EVAL_EPS fixed-seed episodes)"
 python src/eval_policy_so101.py \
   --policy-path "$CKPT" \
   --repo-id "$REPO_ID" --dataset-root "$DS_ROOT" \
-  --episodes "$EVAL_EPS" --save-video \
+  --episodes "$EVAL_EPS" --max-seconds "$EVAL_SECONDS" --save-video \
   --video-dir "outputs/eval_videos/${MODE#--}" \
   --results-out "outputs/eval_results/${MODE#--}.json"
 
@@ -102,5 +105,14 @@ PY
 
 printf '\n\033[1;32mPIPELINE_OK — %d min elapsed\033[0m\n' $(( (SECONDS - t0) / 60 ))
 if [ "$MODE" = "--quick" ]; then
-  echo "This was the smoke-sized run. For the reported 60% at 60k steps: bash run_pipeline.sh --full"
+  cat <<'MSG'
+
+  NOTE: --quick trains for 100 steps and evaluates one 10-second episode. It will report 0%
+  and that is the point — it proves the plumbing (dataset -> ROCm training -> closed-loop
+  evaluation) end to end in a few minutes, nothing more. Measured on this task, success is
+  25% at 20k steps, peaks at 60% at 60k, then declines as the 50-episode dataset's
+  information ceiling is reached. 100 steps is three orders of magnitude short of that.
+
+  For the reported numbers:  bash run_pipeline.sh --full
+MSG
 fi
