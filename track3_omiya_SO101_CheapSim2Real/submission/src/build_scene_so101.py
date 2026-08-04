@@ -24,46 +24,50 @@ SO101_URDF = Path(__file__).resolve().parent.parent / "assets" / "so101" / "so10
 
 
 def default_backend(force_cpu: bool = False):
-    """Pick a Genesis compute backend that actually exists on this machine.
+    """Pick a Genesis compute backend that is known to simulate this scene correctly.
 
-    Development happened on Apple silicon (``gs.metal``); the results were produced on a ROCm
-    host, where that backend does not exist. Hardcoding either one makes the pipeline
-    unrunnable on the other, so probe instead.
+    Three lessons are baked in here, all learned the hard way on a Radeon host:
 
-    The trap worth documenting: on ROCm ``torch.cuda.is_available()`` returns True — ROCm
-    reuses torch's CUDA API — but Genesis computes through Taichi, which has no HIP/ROCm
-    path, so ``gs.cuda`` is rejected with "Torch device 'cuda' not available". AMD GPUs get
-    their own backend, ``gs.amdgpu``. Each candidate is verified by actually initialising
-    Genesis, because availability cannot be inferred from torch alone.
+    1. **Do not name the device yourself — ask for ``gs.gpu``.** Genesis resolves the concrete
+       backend from there, and that is what the Track 3 reference demo does.
+    2. ``gs.cuda`` does not work on ROCm, and torch will not tell you: ROCm reuses torch's
+       CUDA API so ``torch.cuda.is_available()`` returns **True**, while Genesis computes
+       through Taichi, which has no HIP path, and rejects it with
+       "Torch device 'cuda' not available".
+    3. ``gs.amdgpu`` initialises cleanly and then misbehaves — naming it explicitly made this
+       contact-rich scene diverge (the cube's read-back position exploded to metres off a
+       0.5 m table during settling, and the IK targets that followed carried 1.5-5 m errors).
+       Initialising successfully is not evidence a backend works.
+
+    Override with ``SO101_GENESIS_BACKEND=gpu|amdgpu|cuda|cpu|metal`` to experiment.
     """
+    import os
+
     import genesis as gs
 
     if force_cpu:
         return gs.cpu
 
-    candidates = []
+    override = os.environ.get("SO101_GENESIS_BACKEND", "").strip().lower()
+    if override:
+        chosen = {"cpu": gs.cpu, "gpu": gs.gpu, "cuda": gs.cuda,
+                  "amdgpu": gs.amdgpu, "metal": gs.metal}.get(override)
+        if chosen is None:
+            raise ValueError(f"SO101_GENESIS_BACKEND={override!r} is not a Genesis backend")
+        return chosen
+
     try:
         import platform
         import torch
-        if platform.system() == "Darwin":
-            if getattr(torch.backends, "mps", None) and torch.backends.mps.is_available():
-                candidates.append(gs.metal)
-        elif torch.cuda.is_available():
-            # AMD first: on ROCm, torch reports CUDA availability but Taichi cannot use it.
-            is_amd = "hip" in (getattr(torch.version, "hip", None) or "").lower() \
-                or torch.version.hip is not None
-            candidates += [gs.amdgpu, gs.cuda] if is_amd else [gs.cuda, gs.amdgpu]
+        if platform.system() == "Darwin" and getattr(torch.backends, "mps", None) \
+                and torch.backends.mps.is_available():
+            return gs.metal                      # verified: results were produced with this
+        if torch.cuda.is_available():
+            # gs.gpu, not gs.amdgpu/gs.cuda: let Genesis resolve the device itself. This is
+            # what the Track 3 reference demo uses and what works on the Radeon host.
+            return gs.gpu
     except Exception:
         pass
-    candidates.append(gs.cpu)
-
-    for backend in candidates:
-        try:
-            gs.init(backend=backend)
-            gs.destroy()
-            return backend
-        except Exception:
-            continue
     return gs.cpu
 
 # --- Workspace geometry ------------------------------------------------------

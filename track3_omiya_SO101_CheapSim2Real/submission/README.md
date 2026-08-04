@@ -113,6 +113,20 @@ but they matter if you install by hand:
 | `PYOPENGL_PLATFORM=egl` | Genesis rasterises the cameras through pyrender, whose default pyglet path needs a display and fails headless with `IndexError: list index out of range`. Use `osmesa` if your EGL stack is unavailable (software, slower). |
 | `--dataset.video_backend=pyav` (passed per command) | LeRobot defaults to `torchcodec`, whose compiled extension is ABI-incompatible with AMD's custom torch build and fails at import. |
 
+The Genesis compute backend is chosen per platform by `default_backend()` in
+`src/build_scene_so101.py`, and on a ROCm host it resolves to **`gs.cpu`**. That is
+deliberate, not an oversight:
+
+- `gs.cuda` is unavailable — Genesis computes through Taichi, which has no HIP path — even
+  though `torch.cuda.is_available()` returns True on ROCm.
+- `gs.amdgpu` exists and initialises cleanly, but **this scene diverges under it**: the cube's
+  position explodes to metres off the table during settling and the IK targets that follow are
+  nonsense. Physics on CPU is correct and fast enough; the GPU still rasterises both cameras
+  and does all of the training.
+
+Set `SO101_GENESIS_BACKEND=amdgpu` to retest that backend on a newer Genesis release, or pass
+`--cpu` to any script to force CPU explicitly.
+
 `requirements.txt` deliberately omits **torch** (PyPI's wheel is the CUDA build and will not
 see the Radeon GPU — use the template's or AMD's ROCm wheel) and **torchcodec** (see above).
 
