@@ -7,21 +7,25 @@ real-robot result.
 **Where each stage actually ran.** This is the honest split, and Path A follows it rather than
 pretending otherwise:
 
-| Stage | Machine used for the submitted results | Reproducible on a ROCm host? |
+| Stage | Machine used for the submitted results | Verified on the Radeon host? |
 |---|---|---|
-| Demonstration collection (Genesis physics) | macOS / Apple silicon (`gs.metal`) | Not as-is — see the note below |
-| ACT training (all 5 runs) | **ROCm / Radeon GPU** | **Yes, verified** |
-| Closed-loop simulated evaluation | macOS | Yes (same code, `gs.gpu`) |
+| Demonstration collection (Genesis physics) | macOS / Apple silicon (`gs.metal`) | Partly — see the note |
+| ACT training (all 5 runs) | **ROCm / Radeon GPU** | **Yes** |
+| Closed-loop simulated evaluation | macOS | **Yes** — physics on `gs.amdgpu`, cameras via EGL, policy on ROCm |
 | Real-robot evaluation | macOS + SO-101 | Needs the hardware (Path B) |
 
-Collection on a ROCm host is the one step that does not transfer cleanly. Genesis' contact
-solver behaves differently there: the scripted expert's rake grasp flicks the cube instead of
-sweeping it in, and the cube slides off the 0.5 m table (`substeps=4` stabilised this on
-metal — 9/9 grasps — but is not enough on the ROCm backend). Rather than tune it blind, **the
-three datasets are published on Hugging Face**, so Path A starts by downloading them and
-reproduces everything downstream. `src/grasp_demo_so101.py` does run correctly on ROCm
-(verified: success with 0.3 mm placement error), so the scene and the 5-DOF IK are sound
-there; it is the many-episode contact dynamics that need work.
+`run_pipeline.sh --quick` runs the third row end to end on the Radeon host in about 3 minutes,
+so simulation stepping, camera rasterisation, training and policy inference are all confirmed
+working on the GPU.
+
+The one step that has not fully transferred is the **many-episode collection loop**. Genesis'
+contact solver behaves differently on the ROCm backend: the scripted expert's rake grasp
+flicks the cube instead of sweeping it in and the cube slides off the 0.5 m table (`substeps=4`
+stabilised this on metal — 9/9 grasps — but is not enough there). A single episode is fine —
+`src/grasp_demo_so101.py` succeeds on ROCm with 0.3 mm placement error — so the scene and the
+5-DOF IK are sound; it is the repeated contact-rich rollouts that need tuning. Rather than
+tune that blind under a deadline, **the three datasets are published on Hugging Face** and
+Path A downloads them, reproducing everything downstream on the GPU.
 
 Verified on the hackathon Radeon Cloud host: AMD EPYC 9334 + Radeon GPU,
 `torch 2.9.1+rocm7.2.1.gitff65f5bc`, Genesis 1.2.3, headless (no display attached).
@@ -132,19 +136,16 @@ but they matter if you install by hand:
 | `PYOPENGL_PLATFORM=egl` | Genesis rasterises the cameras through pyrender, whose default pyglet path needs a display and fails headless with `IndexError: list index out of range`. Use `osmesa` if your EGL stack is unavailable (software, slower). |
 | `--dataset.video_backend=pyav` (passed per command) | LeRobot defaults to `torchcodec`, whose compiled extension is ABI-incompatible with AMD's custom torch build and fails at import. |
 
-The Genesis compute backend is chosen per platform by `default_backend()` in
-`src/build_scene_so101.py`, and on a ROCm host it resolves to **`gs.cpu`**. That is
-deliberate, not an oversight:
+`default_backend()` in `src/build_scene_so101.py` requests **`gs.gpu`** and lets Genesis
+resolve the device; on the Radeon Cloud host that becomes **`gs.amdgpu`**, so simulation
+physics, camera rasterisation and policy inference all run on the Radeon GPU.
 
-- `gs.cuda` is unavailable — Genesis computes through Taichi, which has no HIP path — even
-  though `torch.cuda.is_available()` returns True on ROCm.
-- `gs.amdgpu` exists and initialises cleanly, but **this scene diverges under it**: the cube's
-  position explodes to metres off the table during settling and the IK targets that follow are
-  nonsense. Physics on CPU is correct and fast enough; the GPU still rasterises both cameras
-  and does all of the training.
+Do not name `gs.cuda` yourself: ROCm reuses torch's CUDA API, so `torch.cuda.is_available()`
+returns True, but Genesis computes through Taichi, which has no HIP path, and rejects it with
+"Torch device 'cuda' not available". Policy inference is the opposite case — there `cuda` is
+correct on ROCm, which is why the two are resolved separately.
 
-Set `SO101_GENESIS_BACKEND=amdgpu` to retest that backend on a newer Genesis release, or pass
-`--cpu` to any script to force CPU explicitly.
+Override with `SO101_GENESIS_BACKEND=gpu|amdgpu|cuda|cpu|metal`, or pass `--cpu` to any script.
 
 `requirements.txt` deliberately omits **torch** (PyPI's wheel is the CUDA build and will not
 see the Radeon GPU — use the template's or AMD's ROCm wheel) and **torchcodec** (see above).

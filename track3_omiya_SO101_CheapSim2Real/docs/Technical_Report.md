@@ -235,24 +235,31 @@ about Genesis on ROCm that are worth recording, because neither is documented:
 
 - **`torch.cuda.is_available()` is True on ROCm and it means nothing to Genesis.** ROCm reuses
   torch's CUDA API, so the obvious check passes — but Genesis computes through Taichi, which
-  has no HIP path, and `gs.cuda` is rejected with "Torch device 'cuda' not available".
-- **Genesis has a `gs.amdgpu` backend; it initialises cleanly and then diverges.** On a Radeon
-  GPU it starts without complaint, but this contact-rich scene becomes unstable under it: the
-  cube's read-back position explodes to metres off a 0.5 m table during the settle phase, and
-  the resulting IK targets are nonsense (position errors of 1.5-5 m against a workspace of
-  0.26 m). **Physics therefore runs on the CPU**, which is correct and fast enough; the GPU
-  rasterises the two cameras and does all of the training. `default_backend()` in
-  `build_scene_so101.py` encodes this choice per platform, with an
-  `SO101_GENESIS_BACKEND` escape hatch for anyone wanting to retest `gs.amdgpu` on a newer
-  Genesis release.
+  has no HIP path, and `gs.cuda` is rejected with "Torch device 'cuda' not available". The fix
+  is to request the generic **`gs.gpu`** and let Genesis resolve the device, which on the
+  Radeon host becomes `gs.amdgpu`. Policy inference is the opposite case: there `cuda` *is*
+  correct on ROCm. The two are therefore resolved by separate helpers in
+  `build_scene_so101.py`, and hardcoding either one (the code was written on Apple silicon,
+  so both defaulted to Metal/MPS) makes every script fail on Linux.
+- **Offscreen rendering needs EGL.** pyrender's default pyglet path requires a display and
+  fails headless with `IndexError: list index out of range` from
+  `display.get_default_screen()`, so `PYOPENGL_PLATFORM=egl` is set before importing Genesis.
 
-Offscreen rendering needed one more thing: pyrender's default pyglet path requires a display
-and fails headless with `IndexError: list index out of range` from
-`display.get_default_screen()`, so `PYOPENGL_PLATFORM=egl` is set before importing Genesis.
+With those two in place, `run_pipeline.sh --quick` completes the full loop — dataset →
+training → closed-loop evaluation — **on the Radeon GPU in about 3 minutes**: simulation
+stepping and camera rasterisation on `gs.amdgpu`, ACT training and inference on ROCm.
+`submission/src/smoke_test_rocm.py` asserts the prerequisites in four checks and is the first
+thing the reproduction guide asks an evaluator to run.
 
-`submission/src/smoke_test_rocm.py` asserts all of this in four checks and is the first thing
-the reproduction guide asks an evaluator to run. An evaluator with no SO-101 can reproduce
-every simulated result in §5.1-§5.3 end to end.
+**What has not fully transferred**, stated plainly: the many-episode collection loop. Genesis'
+contact solver behaves differently on the ROCm backend — the scripted expert's rake grasp
+flicks the cube instead of sweeping it in, and the cube slides off the 0.5 m table
+(`substeps=4` stabilised this on Metal at 9/9 grasps, but is not sufficient there). A single
+episode is fine: `grasp_demo_so101.py` succeeds on ROCm with 0.3 mm placement error, so the
+scene and the 5-DOF IK are sound and it is the repeated contact-rich rollouts that need
+tuning. The submitted datasets were therefore collected on Apple silicon and published on
+Hugging Face, and the reproduction path downloads them. This is a known limitation with a
+concrete next step (substep and solver-iteration sweep on the ROCm backend), not a silent gap.
 
 ---
 

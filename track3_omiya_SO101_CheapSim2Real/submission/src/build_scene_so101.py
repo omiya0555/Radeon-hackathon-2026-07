@@ -45,18 +45,21 @@ def default_policy_device() -> str:
 def default_backend(force_cpu: bool = False):
     """Pick a Genesis compute backend that is known to simulate this scene correctly.
 
-    Three lessons are baked in here, all learned the hard way on a Radeon host:
+    Two lessons are baked in here, both learned the hard way on a Radeon host:
 
-    1. **Do not name the device yourself — ask for ``gs.gpu``.** Genesis resolves the concrete
-       backend from there, and that is what the Track 3 reference demo does.
-    2. ``gs.cuda`` does not work on ROCm, and torch will not tell you: ROCm reuses torch's
-       CUDA API so ``torch.cuda.is_available()`` returns **True**, while Genesis computes
-       through Taichi, which has no HIP path, and rejects it with
+    1. **Ask for ``gs.gpu`` and let Genesis resolve the device.** On the Radeon Cloud host it
+       resolves to ``gs.amdgpu``, and training, rendering and closed-loop evaluation all run
+       there. This is also what the Track 3 reference demo does.
+    2. **Never name ``gs.cuda``, and do not trust torch to tell you.** ROCm reuses torch's
+       CUDA API, so ``torch.cuda.is_available()`` returns **True** — while Genesis computes
+       through Taichi, which has no HIP path, and rejects the backend with
        "Torch device 'cuda' not available".
-    3. ``gs.amdgpu`` initialises cleanly and then misbehaves — naming it explicitly made this
-       contact-rich scene diverge (the cube's read-back position exploded to metres off a
-       0.5 m table during settling, and the IK targets that followed carried 1.5-5 m errors).
-       Initialising successfully is not evidence a backend works.
+
+    Known limitation: the many-episode data-collection loop (scripted expert + per-episode
+    domain randomisation) has shown contact instability on the ROCm backend — the rake grasp
+    flicks the cube off the table. Single-episode ``grasp_demo_so101`` and closed-loop policy
+    evaluation are fine there; the submitted datasets were collected on Apple silicon. Pass
+    ``force_cpu`` or set ``SO101_GENESIS_BACKEND=cpu`` if you hit it while collecting.
 
     Override with ``SO101_GENESIS_BACKEND=gpu|amdgpu|cuda|cpu|metal`` to experiment.
     """
