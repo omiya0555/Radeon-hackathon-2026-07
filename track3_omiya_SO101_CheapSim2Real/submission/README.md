@@ -152,18 +152,23 @@ set-down, and grasp verification with one retry.
 ### A2. Collect 50 demonstrations (~2 h, fully automatic)
 
 ```bash
-python src/record_dataset_so101.py --episodes 50 --dr-all \
-  --repo-id <your-hf-user>/so101_cube_dr
+python src/record_dataset_so101.py --episodes 50 --dr-appearance --dr-runtime \
+  --repo-id <your-hf-user>/so101_cube_dr --root datasets/so101_cube_dr
 ```
 
 No human in the loop. Expert success is 94-98%; only successful episodes are stored, and
-~14% contain a retry. Useful variants:
+~14% contain a retry. The three datasets the report compares differ only in these flags:
 
 ```bash
---episodes 50                       # baseline: placement randomisation only (dataset ①)
---episodes 50 --dr-cube-color       # cube colour only (dataset ②)
---episodes 50 --dr-all              # colour + table + lighting + friction + mass (dataset ③)
+--episodes 50                              # baseline: placement randomisation only (dataset ①)
+--episodes 50 --dr-cube-color              # cube colour only (dataset ②)
+--episodes 50 --dr-appearance --dr-runtime # full DR (dataset ③)
 ```
+
+`--dr-appearance` is shorthand for `--dr-cube-color --dr-table-color --dr-lighting`
+(re-sampled per domain); `--dr-runtime` re-samples friction, mass and world-camera extrinsics
+every episode. Note the output directory flag here is `--root`, while the evaluation scripts
+use `--dataset-root`.
 
 All three share the same seed series, so **placements are identical across datasets** and DR
 is the only variable. That is what makes §5.2/§5.3 of the report controlled comparisons.

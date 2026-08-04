@@ -40,9 +40,12 @@ step "1/4  Collecting $EPISODES demonstrations with the scripted expert (full DR
 if [ -d "$DS_ROOT" ]; then
   echo "  $DS_ROOT already exists — skipping collection (delete it to re-collect)"
 else
+  # --dr-appearance is the shorthand for cube colour + table colour + lighting;
+  # --dr-runtime re-samples friction / mass / world-camera extrinsics every episode.
+  # Together they are the "full DR" configuration of dataset ③.
   python src/record_dataset_so101.py \
-    --episodes "$EPISODES" --dr-all \
-    --repo-id "$REPO_ID" --dataset-root "$DS_ROOT"
+    --episodes "$EPISODES" --dr-appearance --dr-runtime \
+    --repo-id "$REPO_ID" --root "$DS_ROOT"
 fi
 
 # ------------------------------------------------------------------ 2. train
