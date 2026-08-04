@@ -26,6 +26,11 @@ step() { printf '\n\033[1;36m==> %s\033[0m\n' "$*"; }
 t0=$SECONDS
 
 step "Mode: $MODE — $EPISODES episodes, $STEPS training steps, $EVAL_EPS eval episodes"
+if ! python -c "import torch" 2>/dev/null; then
+  echo "ABORT: no torch in $(command -v python). Run setup.sh first; on the amd-oneclick-base"
+  echo "       image the ROCm torch lives in /opt/venv (source /opt/venv/bin/activate)."
+  exit 1
+fi
 python -c "import torch; print('torch', torch.__version__, '| GPU', torch.cuda.get_device_name(0))"
 
 # ---------------------------------------------------------------- 1. collect

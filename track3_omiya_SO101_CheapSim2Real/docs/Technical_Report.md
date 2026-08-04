@@ -186,7 +186,7 @@ each batch and get washed out by the 44,513 sim frames.
 
 ## 4. How the AMD Radeon GPU is used
 
-**Stack.** `torch 2.9.1+rocm7.2.1` on the Radeon Cloud host. ACT: action chunk 100, hidden
+**Stack.** `torch 2.9.1+rocm7.2.1.gitff65f5bc` on the Radeon Cloud host. ACT: action chunk 100, hidden
 dim 512, two ResNet-18 vision towers, VAE latent; batch 8, lr 1e-5.
 
 **Training throughput.** Every run in this submission was trained on the Radeon GPU.

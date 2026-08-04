@@ -5,13 +5,28 @@ result in the technical report, including the headline 60% policy. **Path B** ad
 physical SO-101 and reproduces the 8/10 real-robot result.
 
 Verified on the hackathon Radeon Cloud host: AMD EPYC 9334 + Radeon GPU,
-`torch 2.9.1+rocm7.2.1`, Genesis 1.2.3, headless (no display attached).
+`torch 2.9.1+rocm7.2.1.gitff65f5bc`, Genesis 1.2.3, headless (no display attached).
 
 ---
 
 ## 0. Get the project
 
-On a fresh ROCm instance (the hackathon Radeon Cloud template already has torch installed):
+Verified on a Radeon Cloud instance launched from the
+**`amd-oneclick-base:rocm7.2.1-py3.12-v20260416`** container image (ROCm 7.2.1, Python 3.12).
+
+That image keeps its ROCm build of torch in a virtualenv at **`/opt/venv`**, which the
+template has active on login. If you have left it (or you are on a different host), activate
+it before anything else — `/usr/bin/python` has no torch:
+
+```bash
+source /opt/venv/bin/activate
+python -c "import torch; print(torch.__version__, torch.cuda.is_available())"
+# observed on that image: 2.9.1+gitff65f5b True
+# the version string varies between image builds; what matters is that it prints True
+```
+
+Any ROCm host with torch already installed works. This project never installs torch itself,
+because the PyPI wheel is the CUDA build and cannot see a Radeon GPU.
 
 ```bash
 git clone -b track3-so101-cheap-sim2real \
@@ -21,6 +36,32 @@ cd Radeon-hackathon-2026-07/track3_omiya_SO101_CheapSim2Real/submission
 
 Everything below runs from this `submission/` directory. The SO-101 URDF and meshes are
 bundled in `assets/`, so no further downloads are needed to build the scene.
+
+<details>
+<summary>If <code>git clone</code> fails with <code>server certificate verification failed. CAfile: none</code></summary>
+
+Some ROCm images ship a stale CA bundle and no `http.sslCAInfo`, so git cannot validate
+GitHub's certificate. The TLS handshake itself succeeds — this is a certificate-validation
+failure, not a connectivity problem. Normally this fixes it:
+
+```bash
+apt-get install -y --reinstall ca-certificates
+git config --global http.sslCAInfo /etc/ssl/certs/ca-certificates.crt
+```
+
+If it does not, clone once with verification disabled **for that command only** (`-c` does not
+persist, unlike `git config --global http.sslVerify false`), then verify the content by its
+commit hash — git is content-addressed, so a matching SHA proves nothing was altered in
+transit:
+
+```bash
+git -c http.sslVerify=false clone -b track3-so101-cheap-sim2real \
+  https://github.com/omiya0555/Radeon-hackathon-2026-07.git
+cd Radeon-hackathon-2026-07 && git rev-parse HEAD
+# expect: 3f3ccd776a8ec8a27c52cf285b28d96056628ce6
+```
+
+</details>
 
 ## 1. Environment
 
@@ -58,7 +99,7 @@ Expected tail:
 
 ```
 [OK ] PYOPENGL_PLATFORM — egl
-[OK ] torch + ROCm — 2.9.1+rocm7.2.1 / AMD Radeon ...
+[OK ] torch + ROCm — 2.9.1+rocm7.2.1.gitff65f5bc / AMD Radeon ...
 [OK ] Genesis scene build — SO-101 + table + cube
 [OK ] offscreen render (both cameras) — {'world': (480, 640, 3), 'wrist': (480, 640, 3)}
 SMOKE_OK — data collection, training and sim evaluation are all runnable here
@@ -338,6 +379,8 @@ arm, Fisher p = 0.070 two-tailed.
 
 | Symptom | Cause and fix |
 |---|---|
+| `git clone` → `server certificate verification failed. CAfile: none` | The image's CA bundle is stale and git has no `sslCAInfo`. Fix: `apt-get install -y --reinstall ca-certificates && git config --global http.sslCAInfo /etc/ssl/certs/ca-certificates.crt`. See §0 if that does not help. |
+| `numpy.dtype size changed ... Expected 96, got 88`, or `Numba needs NumPy 2.2 or less` | numpy, numba and scikit-image must move together — moving numpy alone just swaps one error for the other. Install the verified trio: `pip install -U "numpy>=2.4,<2.5" "numba>=0.66" "scikit-image>=0.26"`. `setup.sh` does this automatically when `import genesis` fails. |
 | `IndexError: list index out of range` in pyglet/pyrender | No display. `export PYOPENGL_PLATFORM=egl` (or `osmesa`). |
 | `ImportError` from torchcodec | ABI mismatch with AMD's torch. Pass `--dataset.video_backend=pyav`; do not install torchcodec. |
 | Grasping never succeeds in sim | Collision meshes were convexified. `convexify=False` is mandatory — it destroys the gripper's concave shape. |

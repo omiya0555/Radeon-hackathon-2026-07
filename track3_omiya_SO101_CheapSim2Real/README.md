@@ -91,6 +91,9 @@ bash run_pipeline.sh --quick     # collect -> train -> evaluate, ~25 min
 `--quick` is a shortened run so the flow can be seen end to end; `run_pipeline.sh --full`
 (50 episodes, 100k steps, ~13 h) reproduces the numbers above.
 
+If the clone fails with `server certificate verification failed`, the image's CA bundle is
+stale — see [§0 of the reproduction guide](submission/README.md#0-get-the-project).
+
 [`submission/README.md`](submission/README.md) has the per-experiment commands (checkpoint
 curve, colour sweep), the real-robot path, expected results and troubleshooting.
 

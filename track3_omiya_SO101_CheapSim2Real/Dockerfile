@@ -1,6 +1,6 @@
 # Reproducible ROCm environment for the SO-101 sim-to-real pipeline.
 #
-# Base image is AMD's ROCm PyTorch build — the same torch 2.9.1+rocm7.2.1 the submitted
+# Base image is AMD's ROCm PyTorch build — the same torch 2.9.1+rocm7.2.1.gitff65f5bc the submitted
 # results were produced with. Do not swap in a pip-installed torch: the wheel on PyPI is
 # the CUDA build and will not see the Radeon GPU.
 FROM rocm/pytorch:latest

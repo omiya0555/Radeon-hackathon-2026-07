@@ -1,9 +1,20 @@
 # Simulation + data pipeline. torch is NOT listed here: on a ROCm host it must come from
 # AMD's wheel index (see Dockerfile), and pip would otherwise pull the CUDA build.
 genesis-world>=1.1.2
-numpy>=1.26.4
+
+# `import genesis` pulls in scikit-image and numba, and their numpy requirements have to be
+# satisfied simultaneously. Both floors matter, and pip will not find them on its own if the
+# base image ships an older numba:
+#   scikit-image >=0.26  is built against the numpy 2.4 C API. Pair it with an older numpy and
+#                        the import dies with "numpy.dtype size changed ... Expected 96, got 88".
+#   numba >=0.66         is the first release that accepts numpy 2.4. Older numba refuses
+#                        anything above 2.2 ("Numba needs NumPy 2.2 or less").
+# The combination below is the one the submitted results were produced with.
+numpy>=2.4,<2.5
+numba>=0.66
+scikit-image>=0.26
 trimesh>=4.8.2
-scipy>=1.11
+scipy>=1.18
 
 # Camera I/O and video export. opencv is used directly for the real-robot camera
 # transport (see src/real/ for why the stock LeRobot camera layer is bypassed).
