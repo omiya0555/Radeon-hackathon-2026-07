@@ -37,15 +37,23 @@ python -c "import torch; print('torch', torch.__version__, '| GPU', torch.cuda.g
 step "1/4  Collecting $EPISODES demonstrations with the scripted expert (full DR)"
 # Fully automatic: 5-DOF position-priority IK, rake grasp, retry on a missed lift.
 # No human in the loop — this is the step that replaces hours of teleoperation.
-if [ -d "$DS_ROOT" ]; then
-  echo "  $DS_ROOT already exists — skipping collection (delete it to re-collect)"
+# Reuse an existing dataset only if it is actually complete. A bare directory check is not
+# enough: an aborted collection leaves the directory behind, and skipping on that makes
+# training fail later with a confusing hub 401 (LeRobot falls back to the Hub when local
+# metadata is missing, and "$REPO_ID" is not a real repo).
+if [ -f "$DS_ROOT/meta/info.json" ] && [ -f "$DS_ROOT/meta/tasks.parquet" ]; then
+  echo "  reusing complete dataset at $DS_ROOT (delete it to re-collect)"
 else
+  if [ -d "$DS_ROOT" ]; then
+    echo "  $DS_ROOT exists but is incomplete (no meta/) — re-collecting"
+  fi
   # --dr-appearance is the shorthand for cube colour + table colour + lighting;
   # --dr-runtime re-samples friction / mass / world-camera extrinsics every episode.
   # Together they are the "full DR" configuration of dataset ③.
   python src/record_dataset_so101.py \
     --episodes "$EPISODES" --dr-appearance --dr-runtime \
-    --repo-id "$REPO_ID" --root "$DS_ROOT"
+    --repo-id "$REPO_ID" --root "$DS_ROOT" --overwrite
+  [ -f "$DS_ROOT/meta/info.json" ] || { echo "collection produced no dataset — aborting"; exit 1; }
 fi
 
 # ------------------------------------------------------------------ 2. train
