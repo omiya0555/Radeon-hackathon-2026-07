@@ -46,7 +46,8 @@ from lerobot.datasets.lerobot_dataset import LeRobotDatasetMetadata
 from lerobot.policies.factory import make_policy, make_pre_post_processors
 from lerobot.utils.device_utils import get_safe_torch_device
 
-from build_scene_so101 import CUBE_COLOR_RED, build_scene_so101, default_backend
+from build_scene_so101 import (CUBE_COLOR_RED, build_scene_so101, default_backend,
+                               default_policy_device)
 from grasp_demo_so101 import (
     SO101_FORCE,
     SO101_KP,
@@ -396,7 +397,8 @@ def main() -> None:
     parser.add_argument("--repo-id", required=True, help="Repo id of the training dataset.")
     parser.add_argument("--dataset-root", default=None,
                         help="Local dataset dir (for feature shapes/stats/fps).")
-    parser.add_argument("--device", default="mps", help="mps | cuda | cpu (auto-falls back).")
+    parser.add_argument("--device", default=default_policy_device(),
+                        help="cuda | mps | cpu (defaults to what this machine has).")
     parser.add_argument("--use-amp", action="store_true")
     parser.add_argument("--rename-map", default=None,
                         help="JSON dict mapping dataset image keys to the policy's keys "

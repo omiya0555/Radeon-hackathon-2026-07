@@ -23,6 +23,25 @@ from scipy.spatial.transform import Rotation as _Rot
 SO101_URDF = Path(__file__).resolve().parent.parent / "assets" / "so101" / "so101_north.urdf"
 
 
+def default_policy_device() -> str:
+    """Torch device string for policy inference, resolved per machine.
+
+    Separate from ``default_backend``: that one picks Genesis' physics backend, this one picks
+    where the ACT network runs. ROCm reports itself as ``cuda``, which is correct here (unlike
+    for Genesis, see ``default_backend``). Hardcoding "mps" made every evaluation script fail
+    on Linux inside LeRobot's ``get_safe_torch_device``.
+    """
+    try:
+        import torch
+        if torch.cuda.is_available():
+            return "cuda"
+        if getattr(torch.backends, "mps", None) and torch.backends.mps.is_available():
+            return "mps"
+    except Exception:
+        pass
+    return "cpu"
+
+
 def default_backend(force_cpu: bool = False):
     """Pick a Genesis compute backend that is known to simulate this scene correctly.
 

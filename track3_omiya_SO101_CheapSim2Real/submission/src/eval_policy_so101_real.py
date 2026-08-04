@@ -54,7 +54,7 @@ _ROOT = Path(__file__).resolve().parent
 if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
-from build_scene_so101 import SO101_HOME_QPOS
+from build_scene_so101 import SO101_HOME_QPOS, default_policy_device
 from eval_policy_so101 import STATE_KEY, load_policy
 from grasp_demo_so101 import GRIPPER_CLOSE, GRIPPER_IDLE, GRIPPER_OPEN
 
@@ -459,7 +459,7 @@ def main() -> None:
     p.add_argument("--policy-path", default=None)
     p.add_argument("--repo-id", default=None, help="Dataset repo id the policy was trained on.")
     p.add_argument("--dataset-root", default=None)
-    p.add_argument("--device", default="mps")
+    p.add_argument("--device", default=default_policy_device())
     p.add_argument("--episodes", type=int, default=1)
     p.add_argument("--max-seconds", type=float, default=45.0)
     p.add_argument("--no-task", action="store_true")
