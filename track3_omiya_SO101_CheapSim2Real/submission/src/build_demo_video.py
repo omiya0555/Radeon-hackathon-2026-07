@@ -180,28 +180,33 @@ SEGMENTS: list[Seg] = [
             "only one hundred steps, so it checks the plumbing, not the policy. Trained "
             "properly, this task reaches sixty percent in simulation at sixty thousand steps."),
 
-    Seg("11_real", 30.0, (8, 45), title="On the physical SO-101", source="real", layout="full",
+    # Source trimmed to the action: the cube is on the sheet by ~24 s and the rest of the
+    # recording is the arm sitting still, which adds nothing.
+    Seg("11_real", 18.0, (8, 28), title="On the physical SO-101", source="real", layout="full",
         lines=["Sim-pretrained, then fine-tuned with 10 real teleoperation episodes — about 35 minutes of human time",
-               "8 / 10 success   ·   placement error 1-2 cm   ·   overhead view (left) and wrist camera (right)",
+               "85% success (17/20)   ·   placement error 1-2 cm   ·   overhead view (left) and wrist camera (right)",
                "The first grasp slips and the policy retries: recovery behaviour learned from the simulated expert"],
         say="And this is the same approach on the physical arm. Sim pretrained, then fine tuned "
-            "with only ten real teleoperation episodes. Eight out of ten successes, placing the "
-            "cube within one to two centimetres. Watch the first grasp slip: the policy retries, "
-            "a recovery behaviour it learned from the simulated expert."),
+            "with only ten real teleoperation episodes. Eighty five percent success over twenty "
+            "attempts, placing the cube within one to two centimetres."),
 
-    Seg("12_close", 12.0, None, source="card",
+    Seg("12_close", 15.0, None, source="card",
         title="Results",
-        lines=["Real robot        8/10   (10 real demos)",
-               "Real, no sim      3/10   (control arm)",
-               "Simulation        60%    at 60k steps",
+        lines=["Real robot,  sim + 10 real demos      85%   (17/20)",
+               "Real robot,  10 real demos only       25%   (5/20)",
+               "                                     Fisher p = 0.00033",
                "",
-               "Colour generalisation tracks object-background",
-               "RGB contrast, not hue  (r = 0.956)",
+               "Simulation, 50 scripted demos         60%   at 60k steps",
+               "",
+               "Colour generalisation tracks object-background RGB",
+               "contrast, not hue   (r = 0.879, 20 episodes per colour)",
                "",
                "huggingface.co/omiya239532",
                "AMD AI DevMaster Hackathon · Track 3"],
-        say="Eight out of ten on the physical robot with ten demonstrations, against three out "
-            "of ten without the simulated pretraining. Model and datasets are public. Thank you."),
+        say="Eighty five percent on the physical robot with ten real demonstrations, against "
+            "twenty five percent without the simulated pretraining. Twenty attempts each, on the "
+            "same placements, and the difference is significant. The simulated pretraining is "
+            "what makes ten real demonstrations enough. Model and datasets are public. Thank you."),
 ]
 
 

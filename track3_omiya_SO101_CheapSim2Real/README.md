@@ -8,12 +8,18 @@ a person driving a leader arm, for every task** — the dominant cost of teachin
 anything. So build a measured digital twin, let a scripted expert generate the bulk for free,
 and spend human time only on the handful of episodes that anchor the policy to reality.
 
+![The SO-101 gripper, target sheet and cube](docs/media/real_rig_closeup.jpg)
+
+<sub>The hardware, unretouched: 3D-printed links with visible layer lines, Feetech STS3215
+servos, exposed servo wiring, and rubber bands wound round the fingertips for grip. This is
+what "$150 arm" looks like — and what the policy has to work with.</sub>
+
 ![Real SO-101 and its Genesis twin from the same overhead camera](docs/media/sim2real_overhead.png)
 
-<sub>Two frames placed side by side, centre-cropped to a common aspect and otherwise
-unmodified — the originals are
-[`real_arm_world.png`](docs/media/real_arm_world.png) (real overhead camera) and
-[`sim_arm_world.png`](docs/media/sim_arm_world.png) (Genesis, same pose).</sub>
+<sub>The same scene through the real overhead camera and through its Genesis twin. Two frames
+side by side, centre-cropped to a common aspect and otherwise unmodified — originals:
+[`real_arm_world.png`](docs/media/real_arm_world.png),
+[`sim_arm_world.png`](docs/media/sim_arm_world.png).</sub>
 
 ### In 60 seconds
 
@@ -74,9 +80,9 @@ control arm.
 - Success saturates at **60% at 60k steps** while the loss is still falling — a data ceiling
   of the 50-episode set, not an optimisation failure.
 - Colour generalisation: a policy trained **only on red cubes** keeps working on unseen
-  colours. Success correlates **0.956 with ‖Δc‖**, the RGB-space distance between object and
-  table, and is **independent of hue** — an orthogonal blue and a parallel wood-brown both
-  score 50%. It collapses to 10% only when the cube matches the table colour.
+  colours. Success correlates **0.879 with ‖Δc‖**, the RGB-space distance between object and
+  table (20 episodes per colour). Hue is close to irrelevant: an orthogonal blue scores 50%
+  and a parallel wood-brown 55%. It collapses to 10% only when the cube matches the table.
 - Domain randomisation is nearly free: final loss 0.028 / 0.028 / 0.030 for no-DR /
   colour-only / full DR.
 

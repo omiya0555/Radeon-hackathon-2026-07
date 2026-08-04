@@ -31,6 +31,10 @@ Success means the cube comes to rest inside the sheet footprint at table height,
 **Hardware.** SO-101: a ~$150 3D-printed arm with 5 revolute joints plus a single-actuated
 jaw, driven by Feetech STS3215 servos. Two USB cameras: one overhead, one wrist-mounted.
 
+![The SO-101 gripper, target sheet and cube](media/real_rig_closeup.jpg)
+
+![The real overhead view and the Genesis twin](media/sim2real_overhead.png)
+
 ---
 
 ## 2. System architecture
@@ -274,6 +278,8 @@ comparison is exact.
 |---|---|---|---|---|---|
 | Success | 25% | 40% | **60%** | 55% | 50% |
 
+![Training loss against task success across checkpoints](media/act_red_curve.png)
+
 Success peaks at 60k and **declines** while the training loss is still falling monotonically
 to 0.028. The 50-episode dataset carries about 60% worth of task information for this
 architecture; further optimisation fits the data, not the task. The practical reading: when a
@@ -283,26 +289,36 @@ right one.
 ### 5.2 Colour generalisation: contrast, not hue
 
 Policy ① was trained on **red cubes only**, then evaluated zero-shot on seven unseen colours.
-Ten episodes per colour, seeds 1000-1009, so **every colour sees identical placements**.
+**20 episodes per colour on identical seeds**, so every colour sees the same 20 placements.
 Table colour is green (0.22, 0.60, 0.43).
 
-| Colour | RGB | ‖Δc‖ | cos vs red direction | Success |
+| Colour | RGB | ‖Δc‖ | cos vs red direction | Success (n=20) |
 |---|---|---|---|---|
-| red *(trained)* | (0.85, 0.12, 0.12) | 0.851 | 1.00 | 70% |
-| yellow | (0.90, 0.70, 0.05) | 0.785 | 0.75 | 60% |
+| red *(trained)* | (0.85, 0.12, 0.12) | 0.851 | 1.00 | 60% |
+| yellow | (0.90, 0.70, 0.05) | 0.785 | 0.75 | 65% |
 | black | (0.05, 0.05, 0.05) | 0.690 | 0.47 | 60% |
 | blue | (0.12, 0.18, 0.85) | 0.602 | **0.02** | 50% |
-| wood | (0.65, 0.50, 0.35) | 0.449 | **0.90** | 50% |
-| yellowgreen | (0.50, 0.80, 0.15) | 0.444 | 0.44 | 30% |
-| darkgreen | (0.08, 0.30, 0.20) | 0.403 | 0.28 | 50% |
+| wood | (0.65, 0.50, 0.35) | 0.449 | **0.90** | 55% |
+| yellowgreen | (0.50, 0.80, 0.15) | 0.444 | 0.44 | 40% |
+| darkgreen | (0.08, 0.30, 0.20) | 0.403 | 0.37 | 55% |
 | green *(= table)* | (0.20, 0.62, 0.40) | 0.041 | −0.37 | **10%** |
 
+![Success against object-background contrast, and against hue alignment](media/fig_contrast.png)
+
 **The hypothesis going in was that held-out colours would fail. It was wrong.** A policy that
-has never seen a blue cube handles blue at 50%. What predicts success is
-**‖Δc‖, the RGB-space distance between object and background** (correlation **0.956**), and
-hue is irrelevant: blue is orthogonal to the training colour (cos 0.02), wood is nearly
-parallel (cos 0.90), and both score 50%. Performance collapses to 10% only when the cube
-matches the table.
+has never seen a blue cube handles blue at 50%, and one that has never seen black handles
+black at 60% — the same as the colour it was trained on. What predicts success is
+**‖Δc‖, the RGB-space distance between object and background**: correlation **0.879** across
+the eight colours, and a collapse to 10% only where the cube matches the table.
+
+**Hue contributes little, but "nothing" would be an overstatement.** The cleanest evidence is
+the pair that separates the two axes: blue is *orthogonal* to the training colour (cos 0.02)
+and wood is nearly *parallel* (cos 0.90), yet they score 50% and 55% — indistinguishable at
+this sample size despite opposite hue alignment. Hue alignment does correlate with success on
+its own (r = 0.796), but that is collinearity: in this palette, colours far from the table
+also tend to lie along the red direction. Regress ‖Δc‖ out first and hue's marginal
+correlation with the residual is **0.335** on eight points, i.e. small and not separable from
+noise. Contrast is doing the work; hue is at most a second-order term.
 
 Human perceptual luminance does not explain this — wood differs from the table by 0.014 in
 luminance and "should be invisible", yet scores 50%. The mechanism is that ResNet's first
@@ -317,16 +333,20 @@ set's average trajectory.
 the object-to-background RGB difference. The useful instruction is not "randomise colours"
 but "**keep ‖Δc‖ above ~0.4**".
 
-*Caveat: 10-20 episodes per colour, so each point carries roughly ±15 percentage points of
-binomial noise; the darkgreen/yellowgreen ordering is within that noise. Single task, single
-flat background, single architecture, simulation only.*
+*Caveat: 20 episodes per colour, so each point still carries roughly ±11 percentage points of
+binomial noise — the darkgreen (55%) versus yellowgreen (40%) inversion against their nearly
+equal ‖Δc‖ sits inside that. An earlier 10-episode round gave r = 0.956; the extra episodes
+moved it to 0.879, which is the number to trust. Single task, single flat background (a
+textured one cannot be summarised by a scalar ‖Δc‖), single architecture, simulation only.*
 
 ### 5.3 Domain randomisation is nearly free
 
 A second hypothesis — that DR would cost representational capacity and slow fitting — was
 also refuted. Final losses at 100k: **0.028 (no DR) / 0.028 (colour DR) / 0.030 (full DR)**.
-Learning curves are near-identical. DR's robustness comes at essentially no fitting cost,
+Learning curves are near-identical — the three traces below overlap almost everywhere. DR's robustness comes at essentially no fitting cost,
 which is a useful thing to know before deciding how much of it to enable.
+
+![Training loss for the three domain-randomisation settings](media/loss_compare_3runs.png)
 
 ### 5.4 Real-robot zero-shot transfer
 
@@ -353,6 +373,8 @@ See §6.1: that evaluation ran with a broken wrist camera and cannot support the
 Steps, batch size, learning rate and image augmentation are identical (20k / 8 / 1e-5 /
 enabled), so the only difference is the presence of sim pretraining and sim data. Both were
 evaluated on the **same 10 placements**.
+
+![Real-robot success with 95% Wilson intervals](media/fig_real_bars.png)
 
 - (b) places the cube **1-2 cm** from the sheet centre (12-23% of the sheet width).
 - The two failures were the same mode: the rake misses, the cube shifts, the policy
