@@ -1,8 +1,27 @@
 # Reproduction guide
 
-Two paths. **Path A needs only a ROCm host** — no robot — and reproduces every simulated
-result in the technical report, including the headline 60% policy. **Path B** adds the
-physical SO-101 and reproduces the 8/10 real-robot result.
+Two paths. **Path A needs only a ROCm host** — no robot — and reproduces the trained policies
+and their measured success rates. **Path B** adds the physical SO-101 and reproduces the 8/10
+real-robot result.
+
+**Where each stage actually ran.** This is the honest split, and Path A follows it rather than
+pretending otherwise:
+
+| Stage | Machine used for the submitted results | Reproducible on a ROCm host? |
+|---|---|---|
+| Demonstration collection (Genesis physics) | macOS / Apple silicon (`gs.metal`) | Not as-is — see the note below |
+| ACT training (all 5 runs) | **ROCm / Radeon GPU** | **Yes, verified** |
+| Closed-loop simulated evaluation | macOS | Yes (same code, `gs.gpu`) |
+| Real-robot evaluation | macOS + SO-101 | Needs the hardware (Path B) |
+
+Collection on a ROCm host is the one step that does not transfer cleanly. Genesis' contact
+solver behaves differently there: the scripted expert's rake grasp flicks the cube instead of
+sweeping it in, and the cube slides off the 0.5 m table (`substeps=4` stabilised this on
+metal — 9/9 grasps — but is not enough on the ROCm backend). Rather than tune it blind, **the
+three datasets are published on Hugging Face**, so Path A starts by downloading them and
+reproduces everything downstream. `src/grasp_demo_so101.py` does run correctly on ROCm
+(verified: success with 0.3 mm placement error), so the scene and the 5-DOF IK are sound
+there; it is the many-episode contact dynamics that need work.
 
 Verified on the hackathon Radeon Cloud host: AMD EPYC 9334 + Radeon GPU,
 `torch 2.9.1+rocm7.2.1.gitff65f5bc`, Genesis 1.2.3, headless (no display attached).
@@ -134,16 +153,21 @@ see the Radeon GPU — use the template's or AMD's ROCm wheel) and **torchcodec*
 
 ## 2. The whole pipeline in one command
 
-For a first end-to-end run — collect, train, evaluate — use the driver script:
+For a first end-to-end run — fetch the dataset, train on the Radeon GPU, evaluate — use the
+driver script:
 
 ```bash
-bash run_pipeline.sh --quick     # ~25 min: 5 episodes, 2k steps, 5 eval episodes
-bash run_pipeline.sh --full      # ~13 h:  50 episodes, 100k steps, 20 eval episodes
+bash run_pipeline.sh --quick     # ~20 min: 2k steps, 5 eval episodes
+bash run_pipeline.sh --full      # ~11 h:  100k steps, 20 eval episodes
 ```
 
-`--quick` exists so the flow can be demonstrated end to end in one sitting; **`--full`
-reproduces the numbers reported below**. Both print `PIPELINE_OK` and the measured success
-rate at the end.
+It downloads `omiya239532/so101_cube_dr` (50 episodes, full DR) rather than collecting, for
+the reason given above, then trains and evaluates. Both modes print `PIPELINE_OK` and the
+measured success rate. `--quick` exists so the flow can be seen end to end in one sitting;
+**`--full` reproduces the reported 60%**.
+
+To collect your own demonstrations instead, see A2 — it works on Apple silicon and is worth
+running there if you have it, since it is the step that replaces hours of teleoperation.
 
 Path A below is the same pipeline as individual commands, which is what you want when
 reproducing a specific experiment (the checkpoint curve, the colour sweep) rather than the

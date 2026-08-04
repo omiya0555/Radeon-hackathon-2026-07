@@ -1,22 +1,25 @@
 #!/usr/bin/env bash
-# The whole simulation pipeline, top to bottom: collect -> train -> evaluate.
-# No robot required; everything here runs on the Radeon host.
+# Fetch the demonstration dataset, train ACT on the Radeon GPU, evaluate in closed loop.
+# No robot required.
 #
-#   bash run_pipeline.sh --quick    # ~25 min: 5 episodes, 2k steps, 5 eval episodes
-#   bash run_pipeline.sh --full     # ~13 h:  50 episodes, 100k steps, 20 eval episodes
+#   bash run_pipeline.sh --quick    # ~20 min: 2k steps, 5 eval episodes
+#   bash run_pipeline.sh --full     # ~11 h:  100k steps, 20 eval episodes
 #
-# --quick exists so the flow can be demonstrated (and recorded) end to end in one sitting;
-# --full reproduces the numbers in the technical report.
+# Why this downloads instead of collecting: the submitted datasets were collected on Apple
+# silicon (gs.metal), and Genesis' contact solver behaves differently on the ROCm backend —
+# the rake grasp flicks the cube off the table there. Training and evaluation, which is where
+# the GPU matters, are verified on ROCm. Collect your own with record_dataset_so101.py
+# (see README A2) if you are on a machine where that step is known good.
 set -euo pipefail
 
 MODE="${1:---quick}"
 case "$MODE" in
-  --quick) EPISODES=5;  STEPS=2000;   SAVE_FREQ=1000;  EVAL_EPS=5  ;;
-  --full)  EPISODES=50; STEPS=100000; SAVE_FREQ=20000; EVAL_EPS=20 ;;
+  --quick) STEPS=2000;   SAVE_FREQ=1000;  EVAL_EPS=5  ;;
+  --full)  STEPS=100000; SAVE_FREQ=20000; EVAL_EPS=20 ;;
   *) echo "usage: $0 [--quick|--full]"; exit 2 ;;
 esac
 
-REPO_ID="${REPO_ID:-local/so101_cube_dr}"
+REPO_ID="${REPO_ID:-omiya239532/so101_cube_dr}"
 DS_ROOT="datasets/$(basename "$REPO_ID")"
 OUT_DIR="outputs/act_dr_${MODE#--}"
 export PYOPENGL_PLATFORM="${PYOPENGL_PLATFORM:-egl}"
@@ -25,7 +28,7 @@ cd "$(dirname "$0")"
 step() { printf '\n\033[1;36m==> %s\033[0m\n' "$*"; }
 t0=$SECONDS
 
-step "Mode: $MODE — $EPISODES episodes, $STEPS training steps, $EVAL_EPS eval episodes"
+step "Mode: $MODE — $STEPS training steps, $EVAL_EPS eval episodes"
 if ! python -c "import torch" 2>/dev/null; then
   echo "ABORT: no torch in $(command -v python). Run setup.sh first; on the amd-oneclick-base"
   echo "       image the ROCm torch lives in /opt/venv (source /opt/venv/bin/activate)."
@@ -33,28 +36,28 @@ if ! python -c "import torch" 2>/dev/null; then
 fi
 python -c "import torch; print('torch', torch.__version__, '| GPU', torch.cuda.get_device_name(0))"
 
-# ---------------------------------------------------------------- 1. collect
-step "1/4  Collecting $EPISODES demonstrations with the scripted expert (full DR)"
-# Fully automatic: 5-DOF position-priority IK, rake grasp, retry on a missed lift.
-# No human in the loop — this is the step that replaces hours of teleoperation.
-# Reuse an existing dataset only if it is actually complete. A bare directory check is not
-# enough: an aborted collection leaves the directory behind, and skipping on that makes
-# training fail later with a confusing hub 401 (LeRobot falls back to the Hub when local
-# metadata is missing, and "$REPO_ID" is not a real repo).
+# ------------------------------------------------------------------ 1. dataset
+step "1/4  Fetching the demonstration dataset ($REPO_ID)"
+# 50 episodes collected by the scripted expert with full domain randomisation — no human in
+# the loop, which is the point: this is what replaces hours of teleoperation.
+# Completeness is checked by the metadata files, not by the directory existing: an aborted
+# download leaves the directory behind, and proceeding on that makes training fail later with
+# a confusing Hub 401 (LeRobot falls back to the Hub when local metadata is missing).
 if [ -f "$DS_ROOT/meta/info.json" ] && [ -f "$DS_ROOT/meta/tasks.parquet" ]; then
-  echo "  reusing complete dataset at $DS_ROOT (delete it to re-collect)"
+  echo "  already present at $DS_ROOT"
 else
-  if [ -d "$DS_ROOT" ]; then
-    echo "  $DS_ROOT exists but is incomplete (no meta/) — re-collecting"
-  fi
-  # --dr-appearance is the shorthand for cube colour + table colour + lighting;
-  # --dr-runtime re-samples friction / mass / world-camera extrinsics every episode.
-  # Together they are the "full DR" configuration of dataset ③.
-  python src/record_dataset_so101.py \
-    --episodes "$EPISODES" --dr-appearance --dr-runtime \
-    --repo-id "$REPO_ID" --root "$DS_ROOT" --overwrite
-  [ -f "$DS_ROOT/meta/info.json" ] || { echo "collection produced no dataset — aborting"; exit 1; }
+  [ -d "$DS_ROOT" ] && echo "  $DS_ROOT exists but is incomplete — re-downloading"
+  hf download "$REPO_ID" --repo-type dataset --local-dir "$DS_ROOT" \
+    || python -c "
+from huggingface_hub import snapshot_download
+snapshot_download('$REPO_ID', repo_type='dataset', local_dir='$DS_ROOT')
+"
+  [ -f "$DS_ROOT/meta/info.json" ] || { echo "dataset not available at $DS_ROOT — aborting"; exit 1; }
 fi
+python -c "
+import json; m = json.load(open('$DS_ROOT/meta/info.json'))
+print(f\"  {m['total_episodes']} episodes / {m['total_frames']} frames @ {m['fps']} fps\")
+"
 
 # ------------------------------------------------------------------ 2. train
 step "2/4  Training ACT on the Radeon GPU ($STEPS steps)"
