@@ -45,7 +45,7 @@ import genesis as gs
 from lerobot.configs.video import RGBEncoderConfig
 from lerobot.datasets.lerobot_dataset import LeRobotDataset
 
-from build_scene_so101 import build_scene_so101
+from build_scene_so101 import build_scene_so101, default_backend
 from grasp_demo_so101 import TaskSpec, run_pick_place
 from paths import DATASETS_DIR
 from randomize_so101 import (
@@ -257,7 +257,7 @@ def main() -> None:
 
     max_attempts = args.max_attempts if args.max_attempts > 0 else args.episodes * 5
 
-    backend = gs.cpu if args.cpu else gs.metal
+    backend = default_backend(force_cpu=args.cpu)
     gs.init(backend=backend)
 
     # Layer A appearance is baked at build time, so a new domain needs a rebuild:

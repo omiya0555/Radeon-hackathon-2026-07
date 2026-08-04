@@ -42,6 +42,7 @@ from build_scene_so101 import (
     WORKSPACE_Z,
     SceneBundleSO101,
     build_scene_so101,
+    default_backend,
 )
 
 # Arm base position on the table (xy): grasp bearing and transport arcs are
@@ -392,7 +393,7 @@ def main() -> None:
                         help="place target 'x,y' (default: white sheet center)")
     args = parser.parse_args()
 
-    gs.init(backend=gs.metal)
+    gs.init(backend=default_backend())
     bundle = build_scene_so101(show_viewer=args.vis)
 
     task = TaskSpec()

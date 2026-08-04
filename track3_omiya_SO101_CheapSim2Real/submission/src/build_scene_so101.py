@@ -22,6 +22,29 @@ from scipy.spatial.transform import Rotation as _Rot
 
 SO101_URDF = Path(__file__).resolve().parent.parent / "assets" / "so101" / "so101_north.urdf"
 
+
+def default_backend(force_cpu: bool = False):
+    """Genesis compute backend for this machine.
+
+    Development happened on Apple silicon (``gs.metal``) but the results were produced on a
+    ROCm host, where that backend does not exist — hardcoding either one makes the pipeline
+    unrunnable on the other. ROCm exposes itself through torch's CUDA API, so ``gs.cuda``
+    is the right choice there.
+    """
+    import genesis as gs
+
+    if force_cpu:
+        return gs.cpu
+    try:
+        import torch
+        if torch.cuda.is_available():          # true on ROCm as well as NVIDIA
+            return gs.cuda
+        if getattr(torch.backends, "mps", None) and torch.backends.mps.is_available():
+            return gs.metal
+    except Exception:
+        pass
+    return gs.cpu
+
 # --- Workspace geometry ------------------------------------------------------
 # Real rig: circular green table with a thin silver rim, dark floor around it.
 # The green disk is large enough that the top-down world cam sees green to the

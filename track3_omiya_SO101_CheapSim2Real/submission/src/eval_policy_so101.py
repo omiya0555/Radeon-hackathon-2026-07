@@ -46,7 +46,7 @@ from lerobot.datasets.lerobot_dataset import LeRobotDatasetMetadata
 from lerobot.policies.factory import make_policy, make_pre_post_processors
 from lerobot.utils.device_utils import get_safe_torch_device
 
-from build_scene_so101 import CUBE_COLOR_RED, build_scene_so101
+from build_scene_so101 import CUBE_COLOR_RED, build_scene_so101, default_backend
 from grasp_demo_so101 import (
     SO101_FORCE,
     SO101_KP,
@@ -431,7 +431,7 @@ def main() -> None:
     args = parser.parse_args()
 
     repo_name = args.repo_id.split("/")[-1]
-    gs.init(backend=gs.cpu if args.cpu else gs.metal)
+    gs.init(backend=default_backend(force_cpu=args.cpu))
 
     build_kwargs: dict = {}
     if args.dr_appearance_seed is not None:
