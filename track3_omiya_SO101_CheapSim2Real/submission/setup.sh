@@ -70,17 +70,21 @@ pip uninstall -y -q torchcodec 2>/dev/null || true
 # "numpy.dtype size changed ... Expected 96, got 88" or "Numba needs NumPy 2.2 or less".
 # Verify the real thing rather than a proxy, and force the verified trio if it fails.
 if ! python -c "import genesis" 2>/dev/null; then
-  echo "    'import genesis' failed — installing the verified numpy/numba/scikit-image set"
-  pip install --quiet --no-cache-dir -U "numpy>=2.4,<2.5" "numba>=0.66" "scikit-image>=0.26"
+  echo "    'import genesis' failed — reinstalling numpy and scikit-image as a matched pair"
+  # They must move together: scikit-image's wheels are compiled against one numpy C API, so
+  # changing numpy alone swaps one import error for the other.
+  pip install --quiet --no-cache-dir --force-reinstall \
+      "numpy>=2.2,<2.3" "scikit-image>=0.25,<0.26"
   python -c "import genesis" || {
     echo
     echo "ABORT: 'import genesis' still fails. Show the traceback with:"
     echo "         python -c 'import genesis'"
-    echo "  The submitted results used numpy 2.4.6 / numba 0.66.0 / scikit-image 0.26.0."
+    echo "  Consumers to satisfy simultaneously: lerobot needs numpy<2.3, scikit-image's"
+    echo "  wheels must match the installed numpy's C API, and older numba caps numpy at 2.2."
     exit 1
   }
 fi
-python -c "import numpy, numba, skimage; print(f'    numpy {numpy.__version__} | numba {numba.__version__} | scikit-image {skimage.__version__}')"
+python -c "import numpy, skimage; print(f'    numpy {numpy.__version__} | scikit-image {skimage.__version__}')"
 
 log "4/5  Environment defaults"
 # Genesis rasterises the two cameras through pyrender, whose default pyglet backend needs a

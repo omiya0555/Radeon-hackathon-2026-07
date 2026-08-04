@@ -2,19 +2,20 @@
 # AMD's wheel index (see Dockerfile), and pip would otherwise pull the CUDA build.
 genesis-world>=1.1.2
 
-# `import genesis` pulls in scikit-image and numba, and their numpy requirements have to be
-# satisfied simultaneously. Both floors matter, and pip will not find them on its own if the
-# base image ships an older numba:
-#   scikit-image >=0.26  is built against the numpy 2.4 C API. Pair it with an older numpy and
-#                        the import dies with "numpy.dtype size changed ... Expected 96, got 88".
-#   numba >=0.66         is the first release that accepts numpy 2.4. Older numba refuses
-#                        anything above 2.2 ("Numba needs NumPy 2.2 or less").
-# The combination below is the one the submitted results were produced with.
-numpy>=2.4,<2.5
-numba>=0.66
-scikit-image>=0.26
+# numpy has to satisfy three consumers at once, and they disagree. Pinning it alone is not
+# enough — scikit-image ships wheels compiled against a specific numpy C API, so numpy and
+# scikit-image must move together or the import dies with
+# "numpy.dtype size changed ... Expected 96 from C header, got 88 from PyObject".
+#   lerobot 0.6.0  declares numpy<2.3  -> that is the binding upper bound
+#   scikit-image   0.25.x matches the numpy 2.2 ABI; 0.26 requires numpy>=2.4 and would break it
+#   numba          caps numpy at 2.2 in older releases ("Numba needs NumPy 2.2 or less")
+# numpy 2.2.x + scikit-image 0.25.x satisfies all three. The amd-oneclick-base image ships a
+# numpy 1.x runtime with numpy-2-built scikit-image wheels, i.e. broken before we touch it,
+# so these are floors AND ceilings on purpose.
+numpy>=2.2,<2.3
+scikit-image>=0.25,<0.26
 trimesh>=4.8.2
-scipy>=1.18
+scipy>=1.11,<1.16
 
 # Camera I/O and video export. opencv is used directly for the real-robot camera
 # transport (see src/real/ for why the stock LeRobot camera layer is bypassed).
