@@ -1,25 +1,29 @@
-# Cheap Sim2Real — teaching a $150 arm with 10 real demonstrations
+# 35 Minutes to a New Task — Sim2Real for low-cost arms, verified on the physical robot
 
 **Track 3 (Physical AI) · AMD AI DevMaster Hackathon**
 Genesis · LeRobot ACT · AMD Radeon GPU / ROCm · SO-101
 
-Imitation learning wants ~50 demonstrations per task. On real hardware that is **2-3 hours of
-a person driving a leader arm, for every task** — the dominant cost of teaching a cheap robot
-anything. So build a measured digital twin, let a scripted expert generate the bulk for free,
-and spend human time only on the handful of episodes that anchor the policy to reality.
+A $150 arm is affordable to buy and expensive to teach. Imitation learning wants ~50
+demonstrations per task, which on real hardware is **2-3 hours of a person driving a leader
+arm — for every task, every changed object, every moved camera**. That recurring cost, not
+the hardware price, is what keeps small factories, labs and classrooms from putting these
+arms to work.
+
+This project moves that cost into simulation: a digital twin measured from the rig, a scripted
+expert generating demonstrations for free, ACT trained on one AMD Radeon GPU, and human time
+spent only on the **10 episodes — about 35 minutes** — that anchor the policy to reality.
 
 ![The SO-101 gripper, target sheet and cube](docs/media/real_rig_closeup.jpg)
 
-<sub>The hardware, unretouched: 3D-printed links with visible layer lines, Feetech STS3215
-servos, exposed servo wiring, and rubber bands wound round the fingertips for grip. This is
-what "$150 arm" looks like — and what the policy has to work with.</sub>
+<sub>The hardware, unretouched: 3D-printed links, Feetech STS3215 servos, exposed wiring,
+rubber bands round the fingertips for grip. This is what a $150 arm is, and what the policy
+has to work with.</sub>
 
 ![Real SO-101 and its Genesis twin from the same overhead camera](docs/media/sim2real_overhead.png)
 
-<sub>The same scene through the real overhead camera and through its Genesis twin. Two frames
-side by side, centre-cropped to a common aspect and otherwise unmodified — originals:
-[`real_arm_world.png`](docs/media/real_arm_world.png),
-[`sim_arm_world.png`](docs/media/sim_arm_world.png).</sub>
+<sub>The real overhead camera and its Genesis twin, same scene. Centre-cropped to a common
+aspect, otherwise unmodified ([originals](docs/media/real_arm_world.png)
+· [twin](docs/media/sim_arm_world.png)).</sub>
 
 ### In 60 seconds
 
@@ -32,25 +36,20 @@ side by side, centre-cropped to a common aspect and otherwise unmodified — ori
 | **Reproduce** | 3 commands, ~3 minutes: [jump to it](#reproducing) |
 | **Report** | [`docs/Technical_Report.md`](docs/Technical_Report.md) — method, 5 experiments, failure analysis, stated limits |
 
-### The 10 real demonstrations are what makes it work
-
 <img src="docs/media/real_success.gif" width="49%"> <img src="docs/media/domain_randomisation.gif" width="49%">
 
-**Left:** the physical arm, overhead and wrist cameras. The first grasp slips and the policy
-retries — recovery behaviour it learned from the *simulated* scripted expert, never from a
-human. **Right:** the same scene under domain randomisation, 12 domains at once (cube colour,
-table colour, lighting; friction and mass are re-sampled per episode).
+**Left:** the physical arm (overhead | wrist). The first grasp slips and the policy retries —
+recovery behaviour learned from the *simulated* expert, never demonstrated by a human.
+**Right:** the same scene under domain randomisation, 12 domains at once.
 
 ### Why the GPU is load-bearing
 
-Five ACT runs went into this submission — three domain-randomisation ablations, a co-training
-run, and the control run that gives the 25% above. Each is 20k-100k optimisation steps over
-tens of thousands of frames with two ResNet-18 towers. On the Radeon host a 20k-step fine-tune
-takes **2 h 11 m at 2.56 step/s** in 3.9 GB VRAM, and the loader never starves the GPU
-(`data_s` 0.002 s against `updt_s` 0.388 s — **99.5% of wall-clock is compute**). Without
-that, the honest version of this project is one training run and a claim; with it, two
-plausible hypotheses got tested and refuted (§5.2, §5.3) and the headline result got a
-control arm.
+Five ACT runs went into this submission: three domain-randomisation ablations, the co-training
+run, and the control run behind the 25% above. On the Radeon host a 20k-step fine-tune takes
+**2 h 11 m at 2.56 step/s** in 3.9 GB VRAM, with `data_s` 0.002 s against `updt_s` 0.388 s —
+**99.5% of wall-clock is compute**. Without that budget this is one training run and a claim;
+with it, two plausible hypotheses were tested and refuted (§5.2, §5.3) and the headline result
+got a control arm.
 
 ## What is here
 
@@ -85,6 +84,17 @@ control arm.
   and a parallel wood-brown 55%. It collapses to 10% only when the cube matches the table.
 - Domain randomisation is nearly free: final loss 0.028 / 0.028 / 0.030 for no-DR /
   colour-only / full DR.
+
+### What this buys an operator
+
+Teaching one task drops from **2-3 hours of teleoperation to ~35 minutes**. The simulated half
+runs unattended and overnight, so the recurring cost of a new task, a new object or a moved
+camera falls to one short session at the arm. Two of the findings above translate directly into
+site decisions: **check object-background contrast before collecting** (‖Δc‖ ≥ 0.4 — the same
+policy drops from 55% to 10% on a cube that matches the table), and **stop training at the data
+ceiling** rather than buying steps that no longer help. The validators in `submission/src/`
+exist because a silently frozen camera produced ten unusable episodes whose training loss was
+indistinguishable from clean data.
 
 ## Artifacts
 

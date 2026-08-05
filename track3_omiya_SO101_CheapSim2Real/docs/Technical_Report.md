@@ -1,4 +1,4 @@
-# Cheap Sim2Real: teaching a $150 arm a manipulation task with 10 real demonstrations
+# 35 Minutes to a New Task — Sim2Real for low-cost arms, verified on the physical robot
 
 **AMD AI DevMaster Hackathon — Track 3 (Physical AI)**
 Genesis · LeRobot ACT · AMD Radeon GPU (ROCm) · SO-101
@@ -7,12 +7,17 @@ Genesis · LeRobot ACT · AMD Radeon GPU (ROCm) · SO-101
 
 ## 1. Target application
 
-**The problem.** Imitation learning is the practical way to teach a low-cost arm a new task,
-and the published recipe asks for roughly **50 demonstrations per task** (ACT, Zhao et al.
-2023; the LeRobot SO-101 tutorial recommends the same order). On real hardware that means a
-person physically driving a leader arm for **2-3 hours — per task**. For a $150 arm, the
-human time dominates the total cost of ownership by a wide margin. Every new task, every
-changed object, every moved camera pays it again.
+**The problem, and who has it.** A $150 arm is affordable to buy and expensive to teach.
+Imitation learning is the practical way to give one a new task, and the published recipe asks
+for roughly **50 demonstrations per task** (ACT, Zhao et al. 2023; the LeRobot SO-101 tutorial
+recommends the same order). On real hardware that is a person physically driving a leader arm
+for **2-3 hours — per task**, paid again for every changed object and every moved camera.
+
+For the sites where these arms actually make sense — small-batch manufacturing cells, research
+and teaching labs, benchtop automation — that recurring human cost, not the hardware price, is
+the binding constraint. A cell that changes what it handles weekly cannot spend an afternoon of
+skilled time on each change. The target application of this project is therefore not a single
+task but **the economics of adding one**.
 
 **What this project does.** It moves the bulk of the data cost into simulation, where
 episodes are free, labelled with ground truth, and reproducible from a seed, and spends
